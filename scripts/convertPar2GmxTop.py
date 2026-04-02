@@ -82,6 +82,10 @@ def convert_charmm_to_gromacs(pdb_path, rtf_path, prm_path, par_path, output_pat
             if not bond_exists:
                 struct.bonds.append(pmd.Bond(atom1, atom2))
                 added_bonds += 1
+    if added_bonds:
+        print(f"Added {added_bonds} missing bond(s) from parameter template.")
+    else:
+        print("Bond verification complete: all template bonds are present in the structure.")
 
     # Build a new CHARMM PSF topology object
     psf = charmm.CharmmPsfFile()
@@ -161,8 +165,9 @@ def convert_charmm_to_gromacs(pdb_path, rtf_path, prm_path, par_path, output_pat
           f"{len(struct_with_params.angles)} angles, {len(struct_with_params.dihedrals)} dihedrals")
 
     # Export to GROMACS .top and .gro files in the output directory
-    out_top = output_path / 'cholesterol.top'
-    out_gro = output_path / 'cholesterol.gro'
+    out_stem = pdb_path.stem
+    out_top = output_path / f'{out_stem}.top'
+    out_gro = output_path / f'{out_stem}.gro'
     struct_with_params.save(str(out_top), format='gromacs', overwrite=True)
     struct_with_params.save(str(out_gro), overwrite=True)
 

@@ -1,0 +1,143 @@
+# Build and push GROMACS Docker image to GitHub Container Registry (GHCR)
+#
+# Triggers:
+#   - Push to main/master with changes in docker/gromacs/ or this workflow file
+#   - GitHub Release published (any tag) → builds and tags the image with the release tag
+#   - Manual workflow dispatch (allows selecting GROMACS and CUDA versions)
+#
+# Images are tagged as:
+#   ghcr.io/<owner>/gmxpytools/gromacs:<gmx_version>-cuda<cuda_version>
+#   ghcr.io/<owner>/gmxpytools/gromacs:latest  (only when push_latest is true)
+#
+# Package visibility:
+#   After each push this workflow attempts to set the container package to PUBLIC
+#   so that `docker pull` works without authentication.
+#   If the automatic step fails (e.g. due to org permission settings), go to:
+#     https://github.com/orgs/<owner>/packages  (org account)
+#     https://github.com/users/<owner>/packages (personal account)
+#   → click the package → "Package settings" → change visibility to Public.
+
+name: Build & Push GROMACS Docker Image
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'docker/gromacs/**'
+      - '.github/workflows/docker-gromacs.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      gromacs_version:
+        description: 'GROMACS version to build (e.g. 2025.2)'
+        required: false
+        default: '2025.2'
+      cuda_version:
+        description: 'CUDA version (e.g. 12.8.1)'
+        required: false
+        default: '12.8.1'
+      push_latest:
+        description: 'Also tag as :latest'
+        type: boolean
+        required: false
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/gmxpytools/gromacs
+  DEFAULT_GROMACS_VERSION: '2025.2'
+  DEFAULT_CUDA_VERSION: '12.8.1'
+  # Package name as it appears in GHCR (the part after <owner>/)
+  PACKAGE_NAME: gmxpytools/gromacs
+
+jobs:
+  build-and-push:
+    name: Build GROMACS ${{ inputs.gromacs_version || '2025.2' }} / CUDA ${{ inputs.cuda_version || '12.8.1' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve build parameters
+        id: params
+        run: |
+          GMX_VERSION="${{ inputs.gromacs_version || env.DEFAULT_GROMACS_VERSION }}"
+          CUDA_VER="${{ inputs.cuda_version || env.DEFAULT_CUDA_VERSION }}"
+          echo "gmx_version=${GMX_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "cuda_version=${CUDA_VER}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.params.outputs.gmx_version }}-cuda${{ steps.params.outputs.cuda_version }}
+            type=raw,value=latest,enable=${{ inputs.push_latest == true }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/gromacs
+          file: docker/gromacs/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GROMACS_VERSION=${{ steps.params.outputs.gmx_version }}
+            CUDA_VERSION=${{ steps.params.outputs.cuda_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      # Make the container package publicly pullable without authentication.
+      # The GITHUB_TOKEN has packages:write which is sufficient for packages owned
+      # by the same user/org as the repository.
+      # URL-encode the package name: gmxpytools/gromacs → gmxpytools%2Fgromacs
+      - name: Make container package public
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          PKG: gmxpytools%2Fgromacs
+        run: |
+          # Determine if owner is an org or a user account
+          ACCOUNT_TYPE=$(gh api "/users/${OWNER}" --jq '.type' 2>/dev/null || echo "Unknown")
+          echo "Account type for ${OWNER}: ${ACCOUNT_TYPE}"
+
+          if [ "${ACCOUNT_TYPE}" = "Organization" ]; then
+            API_PATH="/orgs/${OWNER}/packages/container/${PKG}"
+          else
+            API_PATH="/user/packages/container/${PKG}"
+          fi
+
+          echo "Attempting to set package visibility to public via: ${API_PATH}"
+          if gh api --method PATCH "${API_PATH}" -f visibility=public; then
+            echo "✅ Package visibility set to public."
+            echo "   Pull command: docker pull ghcr.io/${OWNER}/gmxpytools/gromacs:${{ steps.params.outputs.gmx_version }}-cuda${{ steps.params.outputs.cuda_version }}"
+          else
+            echo "⚠️  Automatic visibility change failed (may require org-level admin permissions)."
+            echo "   To fix manually:"
+            if [ "${ACCOUNT_TYPE}" = "Organization" ]; then
+              echo "   1. Go to: https://github.com/orgs/${OWNER}/packages/container/gmxpytools%2Fgromacs/settings"
+            else
+              echo "   1. Go to: https://github.com/users/${OWNER}/packages/container/gmxpytools%2Fgromacs/settings"
+            fi
+            echo "   2. Scroll to 'Danger Zone' → 'Change visibility' → select 'Public'"
+          fi
