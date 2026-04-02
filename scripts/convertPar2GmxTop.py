@@ -84,6 +84,8 @@ def convert_charmm_to_gromacs(pdb_path, rtf_path, prm_path, par_path, output_pat
                 added_bonds += 1
     if added_bonds:
         print(f"Added {added_bonds} missing bond(s) from parameter template.")
+    else:
+        print("Bond verification complete: all template bonds are present in the structure.")
 
     # Build a new CHARMM PSF topology object
     psf = charmm.CharmmPsfFile()

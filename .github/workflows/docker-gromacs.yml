@@ -1,13 +1,13 @@
 # Build and push GROMACS Docker image to GitHub Container Registry (GHCR)
 #
 # Triggers:
-#   - Push to main/master with changes in docker/gromacs/
-#   - Git tags matching 'v*'
-#   - Manual workflow dispatch (allows selecting GROMACS version)
+#   - Push to main/master with changes in docker/gromacs/ or this workflow file
+#   - GitHub Release published (any tag) → builds and tags the image with the release tag
+#   - Manual workflow dispatch (allows selecting GROMACS and CUDA versions)
 #
 # Images are tagged as:
 #   ghcr.io/<owner>/gmxpytools/gromacs:<gmx_version>-cuda<cuda_version>
-#   ghcr.io/<owner>/gmxpytools/gromacs:latest  (only for latest GROMACS version)
+#   ghcr.io/<owner>/gmxpytools/gromacs:latest  (only when push_latest is true)
 
 name: Build & Push GROMACS Docker Image
 
@@ -19,8 +19,8 @@ on:
     paths:
       - 'docker/gromacs/**'
       - '.github/workflows/docker-gromacs.yml'
-    tags:
-      - 'v*'
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       gromacs_version:
