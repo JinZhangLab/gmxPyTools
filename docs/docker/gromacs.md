@@ -57,8 +57,12 @@ Tags follow the pattern `<gromacs-version>-cuda<cuda-version>`:
 ## Pull & run
 
 ```bash
-# Pull
+# Pull (no login required — image is public)
 docker pull ghcr.io/jinzhanglab/gmxpytools/gromacs:2025.2-cuda12.8.1
+
+# Verify both executables work (no GPU needed)
+docker run --rm ghcr.io/jinzhanglab/gmxpytools/gromacs:2025.2-cuda12.8.1 \
+  bash -c "gmx --version && echo '---' && gmx_d --version"
 
 # Interactive shell with GPU
 docker run --gpus all -it \
@@ -76,6 +80,22 @@ docker run --rm \
   ghcr.io/jinzhanglab/gmxpytools/gromacs:2025.2-cuda12.8.1 \
   gmx_d mdrun -v -deffnm md
 ```
+
+!!! warning "Troubleshooting `docker pull` denied"
+    GHCR packages are private by default. The CI workflow attempts to set the package
+    public automatically after each push.
+
+    If you still see `denied: denied`, the org admin must set visibility manually:
+
+    1. Go to the package settings:  
+       <https://github.com/orgs/JinZhangLab/packages/container/gmxpytools%2Fgromacs/settings>
+    2. Scroll to **Danger Zone** → **Change visibility** → select **Public** → confirm.
+
+    Alternatively, authenticate first:
+    ```bash
+    echo "<YOUR_GITHUB_PAT>" | docker login ghcr.io -u <your-github-username> --password-stdin
+    docker pull ghcr.io/jinzhanglab/gmxpytools/gromacs:2025.2-cuda12.8.1
+    ```
 
 ### Prerequisites on the host machine
 

@@ -8,6 +8,14 @@
 # Images are tagged as:
 #   ghcr.io/<owner>/gmxpytools/gromacs:<gmx_version>-cuda<cuda_version>
 #   ghcr.io/<owner>/gmxpytools/gromacs:latest  (only when push_latest is true)
+#
+# Package visibility:
+#   After each push this workflow attempts to set the container package to PUBLIC
+#   so that `docker pull` works without authentication.
+#   If the automatic step fails (e.g. due to org permission settings), go to:
+#     https://github.com/orgs/<owner>/packages  (org account)
+#     https://github.com/users/<owner>/packages (personal account)
+#   → click the package → "Package settings" → change visibility to Public.
 
 name: Build & Push GROMACS Docker Image
 
@@ -42,6 +50,8 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/gmxpytools/gromacs
   DEFAULT_GROMACS_VERSION: '2025.2'
   DEFAULT_CUDA_VERSION: '12.8.1'
+  # Package name as it appears in GHCR (the part after <owner>/)
+  PACKAGE_NAME: gmxpytools/gromacs
 
 jobs:
   build-and-push:
@@ -96,3 +106,38 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
+
+      # Make the container package publicly pullable without authentication.
+      # The GITHUB_TOKEN has packages:write which is sufficient for packages owned
+      # by the same user/org as the repository.
+      # URL-encode the package name: gmxpytools/gromacs → gmxpytools%2Fgromacs
+      - name: Make container package public
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          PKG: gmxpytools%2Fgromacs
+        run: |
+          # Determine if owner is an org or a user account
+          ACCOUNT_TYPE=$(gh api "/users/${OWNER}" --jq '.type' 2>/dev/null || echo "Unknown")
+          echo "Account type for ${OWNER}: ${ACCOUNT_TYPE}"
+
+          if [ "${ACCOUNT_TYPE}" = "Organization" ]; then
+            API_PATH="/orgs/${OWNER}/packages/container/${PKG}"
+          else
+            API_PATH="/user/packages/container/${PKG}"
+          fi
+
+          echo "Attempting to set package visibility to public via: ${API_PATH}"
+          if gh api --method PATCH "${API_PATH}" -f visibility=public; then
+            echo "✅ Package visibility set to public."
+            echo "   Pull command: docker pull ghcr.io/${OWNER}/gmxpytools/gromacs:${{ steps.params.outputs.gmx_version }}-cuda${{ steps.params.outputs.cuda_version }}"
+          else
+            echo "⚠️  Automatic visibility change failed (may require org-level admin permissions)."
+            echo "   To fix manually:"
+            if [ "${ACCOUNT_TYPE}" = "Organization" ]; then
+              echo "   1. Go to: https://github.com/orgs/${OWNER}/packages/container/gmxpytools%2Fgromacs/settings"
+            else
+              echo "   1. Go to: https://github.com/users/${OWNER}/packages/container/gmxpytools%2Fgromacs/settings"
+            fi
+            echo "   2. Scroll to 'Danger Zone' → 'Change visibility' → select 'Public'"
+          fi

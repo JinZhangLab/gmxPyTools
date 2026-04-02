@@ -44,11 +44,23 @@ A **multi-stage** GROMACS image (compile in `devel`, ship in lean `runtime`) pro
 
 > **Image size note**: By using a `runtime` base (instead of `devel`) and omitting cuDNN (which GROMACS does not use), the final image is substantially smaller than a naive single-stage build.
 
+#### Host requirements
+
+| Requirement | Notes |
+|-------------|-------|
+| Docker Engine ≥ 20.10 | <https://docs.docker.com/engine/install/> |
+| nvidia-container-toolkit | <https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html> |
+| NVIDIA driver ≥ 525 (for CUDA 12.x) | Verify with `nvidia-smi` |
+
 #### Quick start
 
 ```bash
-# Pull
+# Pull (no login required — image is public)
 docker pull ghcr.io/jinzhanglab/gmxpytools/gromacs:2025.2-cuda12.8.1
+
+# Verify both executables work (no GPU needed for this check)
+docker run --rm ghcr.io/jinzhanglab/gmxpytools/gromacs:2025.2-cuda12.8.1 \
+  bash -c "gmx --version && echo '---' && gmx_d --version"
 
 # Interactive shell with GPU
 docker run --gpus all -it ghcr.io/jinzhanglab/gmxpytools/gromacs:2025.2-cuda12.8.1
@@ -58,17 +70,15 @@ docker run --gpus all --rm \
   -v "$(pwd)":/workspace \
   ghcr.io/jinzhanglab/gmxpytools/gromacs:2025.2-cuda12.8.1 \
   gmx mdrun -v -deffnm md
-
-# Verify both executables
-docker run --rm ghcr.io/jinzhanglab/gmxpytools/gromacs:2025.2-cuda12.8.1 \
-  bash -c "gmx --version && echo '---' && gmx_d --version"
 ```
 
-#### Host requirements
-
-- Docker Engine ≥ 20.10
-- [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
-- NVIDIA driver ≥ 525 (for CUDA 12.x)
+> **Troubleshooting `docker pull` denied**  
+> GHCR packages are private by default. The CI workflow attempts to set the package public automatically.  
+> If you still see "denied", the org admin needs to manually set visibility:  
+> 1. Go to <https://github.com/orgs/JinZhangLab/packages/container/gmxpytools%2Fgromacs/settings>  
+> 2. Scroll to **Danger Zone → Change visibility → Public**  
+>  
+> Alternatively, log in first: `docker login ghcr.io -u <your-github-username>`
 
 #### Build locally with custom versions
 
