@@ -118,14 +118,23 @@ RUN wget -q "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.
 
 ENV PATH="/opt/conda/bin:${PATH}"
 
-# Install AmberTools and gmx_MMPBSA from conda-forge.
+# Install AmberTools and gmx_MMPBSA from conda-forge into a dedicated
+# conda environment named "gmxmmpbsa".
+#
+# Why a dedicated environment?
+#   The latest Miniconda ships with Python 3.13, but gmx_mmpbsa 1.6.x and its
+#   transitive dependency chain (AmberTools, pandas 1.x) require Python >=3.8,
+#   <3.10.  Installing into the base environment therefore hits an unsolvable
+#   version conflict.  Creating an isolated environment with python=3.9 avoids
+#   the conflict entirely and keeps the base conda untouched.
+#
 # --override-channels restricts resolution to the explicitly listed channel
 # (-c conda-forge) only, preventing conda from consulting the default Anaconda
 # channels (pkgs/main, pkgs/r) which now require an interactive TOS acceptance.
 # conda will also pull in its own GROMACS as a dependency of gmx_mmpbsa;
 # that is intentional — our compiled GROMACS (copied below) overrides it via PATH.
-RUN conda install -y -n base -c conda-forge --override-channels \
-        "gmx_mmpbsa=${GMX_MMPBSA_VERSION}" && \
+RUN conda create -y -n gmxmmpbsa -c conda-forge --override-channels \
+        python=3.9 "gmx_mmpbsa=${GMX_MMPBSA_VERSION}" && \
     conda clean -afy
 
 # Copy the compiled GROMACS installation from the builder stage.
@@ -133,7 +142,9 @@ RUN conda install -y -n base -c conda-forge --override-channels \
 # precedence over the GROMACS binary installed by conda.
 COPY --from=builder /usr/local/gromacs /usr/local/gromacs
 
-ENV PATH="/usr/local/gromacs/bin:/opt/conda/bin:${PATH}"
+# Put the dedicated conda environment's bin directory first so that
+# gmx_MMPBSA, ante-MMPBSA.py and MMPBSA.py resolve correctly.
+ENV PATH="/usr/local/gromacs/bin:/opt/conda/envs/gmxmmpbsa/bin:/opt/conda/bin:${PATH}"
 
 # Make GMXRC available in interactive shells
 RUN echo 'source /usr/local/gromacs/bin/GMXRC' >> /etc/bash.bashrc
