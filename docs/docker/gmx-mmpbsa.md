@@ -11,7 +11,7 @@ A multi-stage Docker image that pairs a source-compiled [GROMACS](https://www.gr
 
 ### Why a separate image?
 
-The latest GROMACS releases (2025.x) are not yet fully supported by gmx_MMPBSA 1.6.x and some of its AmberTools dependencies.  Instead of downgrading the simulation image, **a dedicated image pins a GROMACS version that is verified compatible** with gmx_MMPBSA.
+The latest GROMACS releases (2025.x) are not yet fully supported by gmx_MMPBSA 1.6.x and some of its AmberTools dependencies. Instead of downgrading the simulation image, **a dedicated image pins a GROMACS version that is verified compatible** with gmx_MMPBSA.
 
 Recommended two-image workflow:
 
@@ -40,7 +40,7 @@ Data exchange happens through a host-mounted volume (`-v`).
 ```
 Stage 1 (builder): ubuntu:22.04
   └─ Installs build tools, compilers, CMake (Kitware PPA), OpenMPI dev
-  └─ Downloads + compiles gmx  (single-precision, CPU-only, FFTW built-in)
+  └─ Downloads + compiles gmx (single-precision, CPU-only, FFTW built-in)
 
 Stage 2 (runtime): ubuntu:22.04  ← same glibc as builder
   └─ Installs Miniconda → conda-forge: gmx_mmpbsa + AmberTools
@@ -51,7 +51,7 @@ Stage 2 (runtime): ubuntu:22.04  ← same glibc as builder
 
 ### Why CPU-only GROMACS?
 
-gmx_MMPBSA uses GROMACS only for trajectory format conversion and energy recomputation — short, single-frame operations that are CPU-bound.  There is no benefit to including CUDA in this image, which keeps the image size significantly smaller.
+gmx_MMPBSA uses GROMACS only for trajectory format conversion and energy recomputation — short, single-frame operations that are CPU-bound. There is no benefit to including CUDA in this image, which keeps the image size significantly smaller.
 
 ### FFTW
 

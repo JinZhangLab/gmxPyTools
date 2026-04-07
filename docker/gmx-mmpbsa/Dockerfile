@@ -6,10 +6,10 @@
 # Design rationale
 # ─────────────────
 # The latest GROMACS releases (2025.x) are not yet fully supported by
-# gmx_MMPBSA and some of its AmberTools dependencies.  Rather than coupling
+# gmx_MMPBSA and some of its AmberTools dependencies. Rather than coupling
 # the simulation image (docker/gromacs) to an older GROMACS, we maintain a
 # dedicated gmx-mmpbsa image that pins a GROMACS version known to work
-# (2024.4 by default).  Users run production MD with the latest GROMACS image
+# (2024.4 by default). Users run production MD with the latest GROMACS image
 # and run MM-PB(GB)SA post-analysis with this image — sharing data via a
 # host-mounted volume.
 #
