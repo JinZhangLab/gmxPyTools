@@ -11,19 +11,24 @@ A growing toolkit of Docker images, Python scripts, and automation workflows tha
 ```
 gmxPyTools/
 ├── docker/                        # Docker images (one sub-directory per image)
-│   └── gromacs/
-│       └── Dockerfile             # Multi-stage: devel builder → runtime final
+│   ├── gromacs/
+│   │   └── Dockerfile             # Multi-stage: devel builder → runtime final
+│   └── gmx-mmpbsa/
+│       └── Dockerfile             # Multi-stage: CPU GROMACS builder → conda runtime
 ├── scripts/                       # Standalone Python utilities
 │   └── convertPar2GmxTop.py       # Convert CHARMM (MATCH) files to GROMACS topology
 ├── docs/                          # MkDocs documentation source
 │   ├── index.md
 │   ├── ARCHITECTURE.md            # Binding architectural constraints
-│   ├── docker/gromacs.md
+│   ├── docker/
+│   │   ├── gromacs.md
+│   │   └── gmx-mmpbsa.md
 │   └── scripts/convert-charmm-to-gromacs.md
 ├── mkdocs.yml                     # MkDocs configuration
 └── .github/
     └── workflows/
         ├── docker-gromacs.yml     # CI/CD: build & push GROMACS image to GHCR
+        ├── docker-gmx-mmpbsa.yml  # CI/CD: build & push gmx_MMPBSA image to GHCR
         └── docs.yml               # CI/CD: deploy docs to GitHub Pages
 ```
 
@@ -94,6 +99,87 @@ See [docs/docker/gromacs.md](docs/docker/gromacs.md) for full documentation.
 
 ---
 
+### gmx_MMPBSA with GROMACS (`docker/gmx-mmpbsa`)
+
+A dedicated image for **MM-PB(GB)SA free energy calculations** combining a source-compiled GROMACS (verified compatible with gmx_MMPBSA) with [gmx_MMPBSA](https://valdes-tresanco-ms.github.io/gmx_MMPBSA/) and [AmberTools](https://ambermd.org/AmberTools.php) installed via conda-forge.
+
+> **Why a separate image?**  
+> The latest GROMACS (2025.x) is not yet fully supported by gmx_MMPBSA 1.6.x.  
+> Use the `gromacs` image for GPU-accelerated MD simulations and this image for post-analysis — sharing data through a host-mounted volume.
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| `gmx` | 2024.4 (default) | Trajectory processing (CPU-only) |
+| `gmx_MMPBSA` | 1.6.3 (default) | MM-PB(GB)SA free energy |
+| AmberTools | via conda-forge | Topology prep (`ante-MMPBSA.py`) |
+
+#### Host requirements
+
+| Requirement | Notes |
+|-------------|-------|
+| Docker Engine ≥ 20.10 | <https://docs.docker.com/engine/install/> |
+| No GPU required | gmx_MMPBSA analysis is CPU-only |
+
+#### Quick start
+
+```bash
+# Pull (no login required — image is public)
+docker pull ghcr.io/jinzhanglab/gmxpytools/gmx-mmpbsa:2024.4-mmpbsa1.6.3
+
+# Verify tools work
+docker run --rm ghcr.io/jinzhanglab/gmxpytools/gmx-mmpbsa:2024.4-mmpbsa1.6.3 \
+  bash -c "gmx --version && gmx_MMPBSA --version"
+
+# Interactive shell with local files mounted
+docker run --rm -it \
+  -v "$(pwd)":/workspace \
+  ghcr.io/jinzhanglab/gmxpytools/gmx-mmpbsa:2024.4-mmpbsa1.6.3
+
+# Run MM-GBSA analysis on local trajectory files
+docker run --rm \
+  -v "$(pwd)":/workspace \
+  ghcr.io/jinzhanglab/gmxpytools/gmx-mmpbsa:2024.4-mmpbsa1.6.3 \
+  gmx_MMPBSA -O -i mmgbsa.in -cs md.tpr -ct md.xtc \
+             -cp topol.top -ci index.ndx \
+             -co complex.prmtop \
+             -o FINAL_RESULTS_MMPBSA.dat \
+             -eo FINAL_RESULTS_MMPBSA.csv
+```
+
+#### Typical two-image workflow
+
+```bash
+# Step 1 — GPU-accelerated MD with the latest GROMACS
+docker run --gpus all --rm \
+  -v "$(pwd)":/workspace \
+  ghcr.io/jinzhanglab/gmxpytools/gromacs:2025.2-cuda12.8.1 \
+  gmx mdrun -v -deffnm md
+
+# Step 2 — MMPBSA analysis (no GPU needed)
+docker run --rm \
+  -v "$(pwd)":/workspace \
+  ghcr.io/jinzhanglab/gmxpytools/gmx-mmpbsa:2024.4-mmpbsa1.6.3 \
+  gmx_MMPBSA -O -i mmgbsa.in -cs md.tpr -ct md.xtc \
+             -cp topol.top -ci index.ndx \
+             -co complex.prmtop \
+             -o FINAL_RESULTS_MMPBSA.dat \
+             -eo FINAL_RESULTS_MMPBSA.csv
+```
+
+#### Build locally with custom versions
+
+```bash
+docker build \
+  --build-arg GROMACS_VERSION=2023.5 \
+  --build-arg GMX_MMPBSA_VERSION=1.6.3 \
+  -t gmx-mmpbsa:2023.5-mmpbsa1.6.3 \
+  docker/gmx-mmpbsa/
+```
+
+See [docs/docker/gmx-mmpbsa.md](docs/docker/gmx-mmpbsa.md) for full documentation.
+
+---
+
 ## Python Scripts
 
 ### `scripts/convertPar2GmxTop.py`
@@ -118,6 +204,7 @@ See [docs/scripts/convert-charmm-to-gromacs.md](docs/scripts/convert-charmm-to-g
 | Workflow | Trigger | Action |
 |----------|---------|--------|
 | `docker-gromacs.yml` | Push to main (docker/gromacs/ changes), Release published, Manual | Build & push GROMACS image to GHCR |
+| `docker-gmx-mmpbsa.yml` | Push to main (docker/gmx-mmpbsa/ changes), Release published, Manual | Build & push gmx_MMPBSA image to GHCR |
 | `docs.yml` | Push to main (docs/ changes), Manual | Build & deploy docs to GitHub Pages |
 
 ---
