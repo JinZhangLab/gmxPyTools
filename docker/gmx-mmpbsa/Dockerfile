@@ -119,9 +119,12 @@ RUN wget -q "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.
 ENV PATH="/opt/conda/bin:${PATH}"
 
 # Install AmberTools and gmx_MMPBSA from conda-forge.
+# --override-channels restricts resolution to the explicitly listed channel
+# (-c conda-forge) only, preventing conda from consulting the default Anaconda
+# channels (pkgs/main, pkgs/r) which now require an interactive TOS acceptance.
 # conda will also pull in its own GROMACS as a dependency of gmx_mmpbsa;
 # that is intentional — our compiled GROMACS (copied below) overrides it via PATH.
-RUN conda install -y -n base -c conda-forge \
+RUN conda install -y -n base -c conda-forge --override-channels \
         "gmx_mmpbsa=${GMX_MMPBSA_VERSION}" && \
     conda clean -afy
 

@@ -52,6 +52,8 @@ env:
   DEFAULT_CUDA_VERSION: '12.8.1'
   # Package name as it appears in GHCR (the part after <owner>/)
   PACKAGE_NAME: gmxpytools/gromacs
+  # Opt into Node.js 24 runtime for all actions (suppresses Node.js 20 deprecation warnings).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-and-push:
