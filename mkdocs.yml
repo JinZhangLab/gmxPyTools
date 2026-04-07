@@ -48,6 +48,7 @@ nav:
   - Home: index.md
   - Docker Images:
     - GROMACS (CUDA): docker/gromacs.md
+    - gmx_MMPBSA: docker/gmx-mmpbsa.md
   - Python Scripts:
     - CHARMM → GROMACS topology: scripts/convert-charmm-to-gromacs.md
   - Architecture: ARCHITECTURE.md
